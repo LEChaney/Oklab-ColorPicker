@@ -3,7 +3,7 @@ const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
 let win;
 app.whenReady().then(() => {
   win = new BrowserWindow({
-    width: 400, height: 860, backgroundColor: '#1e1e2e',
+    width: 400, height: 890, backgroundColor: '#1e1e2e',
     webPreferences: { nodeIntegration: true, contextIsolation: false }
   });
   win.setMenuBarVisibility(false);
