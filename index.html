@@ -241,9 +241,65 @@
     }
 
     #lighting-panel.open {
-      max-height: 800px;
+      max-height: 900px;
       opacity: 1;
       margin: 14px auto 0;
+    }
+
+    /* Intensity slider */
+    .intensity-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 10px auto 0;
+      width: 300px;
+    }
+
+    .intensity-row label {
+      font-size: 11px;
+      color: #a6adc8;
+      white-space: nowrap;
+      min-width: 62px;
+    }
+
+    .intensity-track {
+      flex: 1;
+      height: 18px;
+      border-radius: 6px;
+      cursor: crosshair;
+      position: relative;
+      background: linear-gradient(to right, #1e1e2e, #f9e2af);
+      border: 1px solid #45475a;
+    }
+
+    .intensity-fill {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      border-radius: 5px;
+      background: #f9e2af;
+      pointer-events: none;
+      opacity: 0.25;
+    }
+
+    .intensity-thumb {
+      position: absolute;
+      top: -2px;
+      width: 4px;
+      height: 22px;
+      border-radius: 2px;
+      background: #cdd6f4;
+      border: 1px solid #1e1e2e;
+      pointer-events: none;
+      transform: translateX(-50%);
+    }
+
+    .intensity-value {
+      font-size: 11px;
+      color: #cdd6f4;
+      font-weight: 600;
+      min-width: 38px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
 
     .lighting-divider {
@@ -465,6 +521,16 @@
       </div>
     </div>
 
+    <!-- Light Intensity slider -->
+    <div class="intensity-row">
+      <label>☀️ Intensity:</label>
+      <div class="intensity-track" id="intensity-track">
+        <div class="intensity-fill" id="intensity-fill"></div>
+        <div class="intensity-thumb" id="intensity-thumb"></div>
+      </div>
+      <span class="intensity-value" id="intensity-value">1.00</span>
+    </div>
+
     <!-- Result mini a,b map (read-only) -->
     <canvas id="result-ab-map" width="150" height="150"></canvas>
     <span class="slider-label" style="width:150px; margin-top:4px;">Result in OKLab a,b plane</span>
@@ -472,10 +538,22 @@
     <!-- Result numeric values -->
     <div class="lighting-result-info" id="lighting-result-values"></div>
     <div class="hex-row" style="margin-top:6px">
-      <label>Result:</label>
-      <span class="hex-value" id="result-hex"></span>
-      <span id="result-gamut-indicator"></span>
-      <button class="copy-button" onclick="copyToClipboard(this, 'result-hex')">📋</button>
+      <label>sRGB:</label>
+      <span class="hex-value" id="result-srgb-hex"></span>
+      <span id="result-srgb-gamut"></span>
+      <button class="copy-button" onclick="copyToClipboard(this, 'result-srgb-hex')">📋</button>
+    </div>
+    <div class="hex-row">
+      <label>Display P3:</label>
+      <span class="hex-value" id="result-p3-hex"></span>
+      <span id="result-p3-gamut"></span>
+      <button class="copy-button" onclick="copyToClipboard(this, 'result-p3-hex')">📋</button>
+    </div>
+    <div class="hex-row" id="result-wcs-row" style="display:none">
+      <label id="result-wcs-label">Working:</label>
+      <span class="hex-value" id="result-wcs-hex"></span>
+      <span id="result-wcs-gamut"></span>
+      <button class="copy-button" onclick="copyToClipboard(this, 'result-wcs-hex')">📋</button>
     </div>
     <div class="hex-row">
       <label>CSS:</label>
@@ -695,6 +773,9 @@
     let albedoL = 0.7, albedoA = 0.0, albedoB = 0.0;
     // Light color (OKLab) — initialized to white (neutral)
     let lightL = 1.0, lightA = 0.0, lightB = 0.0;
+    // Physical linear intensity multiplier for the light (default 1.0)
+    let lightIntensity = 1.0;
+    const INTENSITY_MAX = 10.0;
 
     // ── Color Selection History ──
     // Three independent history stacks: main picker, albedo, and light.
@@ -703,6 +784,10 @@
     const historyAlbedo = { entries: [[0.7, 0.0, 0.0]], pos: 0 };
     const historyLight  = { entries: [[1.0, 0.0, 0.0]], pos: 0 };
     const MAX_HISTORY = 200;
+
+    // ── Persistence ──
+    // Stores the raw ICC profile bytes so the custom working CS survives restarts.
+    let iccProfileBase64 = null;
 
     /** Canvas dimensions & OKLab axis range */
     const PICKER_SIZE = 300;         // Width & height of the a,b picker (px)
@@ -1074,8 +1159,14 @@
       try {
         const buffer = await input.files[0].arrayBuffer();
         workingCS = parseICCProfile(buffer);
+        // Cache the raw profile bytes for persistence
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        iccProfileBase64 = btoa(binary);
         updateWorkingCSDisplay();
         renderAll();
+        scheduleSave();
       } catch (err) {
         alert('Failed to load ICC profile:\n' + err.message);
       }
@@ -1087,8 +1178,118 @@
      */
     function resetWorkingCS() {
       workingCS = isDisplayP3Supported ? createP3WorkingCS() : createSRGBWorkingCS();
+      iccProfileBase64 = null;
       updateWorkingCSDisplay();
       renderAll();
+      scheduleSave();
+    }
+
+
+    // ================================================================
+    //  AUTO-SAVE / RESTORE
+    //  Persists application state to localStorage with a debounced
+    //  save (500 ms), so rapid interactions don't cause lag.
+    //  Restores state on next launch before the first render.
+    // ================================================================
+
+    const STORAGE_KEY = 'oklab-color-picker-state';
+    const SAVE_HISTORY_CAP = 50; // Keep last N entries per stack when saving
+    let saveTimer = null;
+
+    /** Schedule a debounced save (coalesces rapid changes). */
+    function scheduleSave() {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveState, 500);
+    }
+
+    /** Serialize current state to localStorage. */
+    function saveState() {
+      saveTimer = null;
+      try {
+        const capHistory = (h) => {
+          const start = Math.max(0, h.entries.length - SAVE_HISTORY_CAP);
+          const entries = h.entries.slice(start);
+          const pos = Math.max(0, h.pos - start);
+          return { entries, pos };
+        };
+        const state = {
+          // Current picker color
+          currentL, currentA, currentB,
+          // Lighting Lab
+          albedoL, albedoA, albedoB,
+          lightL, lightA, lightB,
+          lightIntensity,
+          editTarget,
+          isLightingOpen,
+          // History (capped)
+          historyMain:   capHistory(historyMain),
+          historyAlbedo: capHistory(historyAlbedo),
+          historyLight:  capHistory(historyLight),
+          // Working color space
+          iccProfileBase64,
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (_) { /* quota exceeded or other — silently skip */ }
+    }
+
+    /**
+     * Restore saved state from localStorage.
+     * Returns true if state was restored, false otherwise.
+     */
+    function restoreState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+        const s = JSON.parse(raw);
+
+        // Picker color
+        if (typeof s.currentL === 'number') currentL = s.currentL;
+        if (typeof s.currentA === 'number') currentA = s.currentA;
+        if (typeof s.currentB === 'number') currentB = s.currentB;
+
+        // Lighting Lab colors
+        if (typeof s.albedoL === 'number') { albedoL = s.albedoL; albedoA = s.albedoA; albedoB = s.albedoB; }
+        if (typeof s.lightL  === 'number') { lightL  = s.lightL;  lightA  = s.lightA;  lightB  = s.lightB;  }
+        if (typeof s.lightIntensity === 'number') lightIntensity = s.lightIntensity;
+        if (typeof s.editTarget === 'string') editTarget = s.editTarget;
+
+        // History stacks
+        const loadHistory = (target, src) => {
+          if (src && Array.isArray(src.entries) && src.entries.length > 0) {
+            target.entries = src.entries;
+            target.pos = Math.min(src.pos || 0, src.entries.length - 1);
+          }
+        };
+        loadHistory(historyMain,   s.historyMain);
+        loadHistory(historyAlbedo, s.historyAlbedo);
+        loadHistory(historyLight,  s.historyLight);
+
+        // ICC profile
+        if (s.iccProfileBase64) {
+          try {
+            const binary = atob(s.iccProfileBase64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            workingCS = parseICCProfile(bytes.buffer);
+            iccProfileBase64 = s.iccProfileBase64;
+          } catch (_) { /* profile failed to parse — keep default CS */ }
+        }
+
+        // Lighting Lab open state
+        if (s.isLightingOpen) {
+          isLightingOpen = true;
+          document.getElementById('lighting-panel').classList.add('open');
+          document.getElementById('lighting-toggle-button').classList.add('active');
+          // Restore tab selection UI directly (avoid triggering scheduleSave)
+          document.getElementById('tab-albedo').classList.toggle('tab-active', editTarget === 'albedo');
+          document.getElementById('tab-light').classList.toggle('tab-active', editTarget === 'light');
+          document.getElementById('swatch-albedo').classList.toggle('selected', editTarget === 'albedo');
+          document.getElementById('swatch-light').classList.toggle('selected', editTarget === 'light');
+          syncPickerToEditTarget();
+        }
+
+        return true;
+      } catch (_) { return false; }
     }
 
 
@@ -1635,10 +1836,10 @@
       const [albR, albG, albB] = oklabToLinearSRGB(albedoL, albedoA, albedoB);
       const [litR, litG, litB] = oklabToLinearSRGB(lightL, lightA, lightB);
 
-      // Component-wise multiplication in linear light
-      const resultR = albR * litR;
-      const resultG = albG * litG;
-      const resultB = albB * litB;
+      // Component-wise multiplication in linear light, scaled by intensity
+      const resultR = albR * litR * lightIntensity;
+      const resultG = albG * litG * lightIntensity;
+      const resultB = albB * litB * lightIntensity;
 
       return linearSRGBToOKLab(resultR, resultG, resultB);
     }
@@ -1724,8 +1925,17 @@
       // Update swatches using CSS oklab()
       document.getElementById('swatch-albedo').style.background =
         `oklab(${albedoL} ${albedoA} ${albedoB})`;
-      document.getElementById('swatch-light').style.background =
-        `oklab(${lightL} ${lightA} ${lightB})`;
+      document.getElementById('swatch-light').style.background = (() => {
+        const [lr, lg, lb] = oklabToLinearSRGB(lightL, lightA, lightB);
+        const [iL, iA, iB] = linearSRGBToOKLab(lr * lightIntensity, lg * lightIntensity, lb * lightIntensity);
+        return `oklab(${iL} ${iA} ${iB})`;
+      })();
+
+      // Update intensity slider UI
+      const pct = Math.min(lightIntensity / INTENSITY_MAX, 1) * 100;
+      document.getElementById('intensity-fill').style.width = pct + '%';
+      document.getElementById('intensity-thumb').style.left = pct + '%';
+      document.getElementById('intensity-value').textContent = lightIntensity.toFixed(2);
 
       const [resL, resA, resB] = computeLitColor();
       document.getElementById('swatch-result').style.background =
@@ -1740,16 +1950,46 @@
         `<span class="label">C:</span> <b>${resChroma.toFixed(3)}</b>&ensp;` +
         `<span class="label">h:</span> <b>${resHue.toFixed(1)}°</b>`;
 
-      // Result hex
+      // Result hex codes: sRGB, Display P3, Working CS
       const [linR, linG, linB] = oklabToLinearSRGB(resL, resA, resB);
-      const resultInGamut = isInGamut(linR, linG, linB);
-      const resultHex = rgbToHex(
-        linearToGamma(linR), linearToGamma(linG), linearToGamma(linB)
-      );
-      document.getElementById('result-hex').textContent = resultHex;
-      document.getElementById('result-gamut-indicator').innerHTML = resultInGamut
+
+      // sRGB
+      const srgbOk = isInGamut(linR, linG, linB);
+      const srgbHex = rgbToHex(linearToGamma(linR), linearToGamma(linG), linearToGamma(linB));
+      document.getElementById('result-srgb-hex').textContent = srgbHex;
+      document.getElementById('result-srgb-gamut').innerHTML = srgbOk
         ? '<span class="in-gamut" title="In sRGB gamut">✓</span>'
         : '<span class="out-of-gamut" title="Out of sRGB gamut">✗</span>';
+
+      // Display P3
+      const [p3R, p3G, p3B] = linearSRGBToLinearP3(linR, linG, linB);
+      const p3Ok = isInGamut(p3R, p3G, p3B);
+      const p3Hex = rgbToHex(linearToGamma(p3R), linearToGamma(p3G), linearToGamma(p3B));
+      document.getElementById('result-p3-hex').textContent = p3Hex;
+      document.getElementById('result-p3-gamut').innerHTML = p3Ok
+        ? '<span class="in-gamut" title="In Display P3 gamut">✓</span>'
+        : '<span class="out-of-gamut" title="Out of Display P3 gamut">✗</span>';
+
+      // Working CS (only shown for custom ICC profiles)
+      const isCustomCS = workingCS.name !== 'Display P3' && workingCS.name !== 'sRGB';
+      document.getElementById('result-wcs-row').style.display = isCustomCS ? '' : 'none';
+      if (isCustomCS) {
+        const [wcR, wcG, wcB] = workingCS.fromLinearSRGB(linR, linG, linB);
+        const wcOk = isInGamut(wcR, wcG, wcB);
+        let wcHex;
+        if (workingCS.perChannelTRC) {
+          wcHex = rgbToHex(workingCS.encode(wcR, 0), workingCS.encode(wcG, 1), workingCS.encode(wcB, 2));
+        } else {
+          wcHex = rgbToHex(workingCS.encode(wcR), workingCS.encode(wcG), workingCS.encode(wcB));
+        }
+        document.getElementById('result-wcs-hex').textContent = wcHex;
+        document.getElementById('result-wcs-gamut').innerHTML = wcOk
+          ? '<span class="in-gamut" title="In ' + workingCS.name + ' gamut">✓</span>'
+          : '<span class="out-of-gamut" title="Out of ' + workingCS.name + ' gamut">✗</span>';
+        document.getElementById('result-wcs-label').textContent = workingCS.name.length > 10
+          ? workingCS.name.slice(0, 9) + '…:' : workingCS.name + ':';
+      }
+
       document.getElementById('result-css-value').textContent =
         `oklab(${resL.toFixed(3)} ${resA.toFixed(3)} ${resB.toFixed(3)})`;
 
@@ -1874,11 +2114,8 @@
       document.getElementById('swatch-light').classList.toggle('selected', target === 'light');
       syncPickerToEditTarget();
       renderAll();
+      scheduleSave();
     }
-
-    /**
-     * Toggle the Lighting Lab panel open/closed.
-     */
     function toggleLightingPanel() {
       isLightingOpen = !isLightingOpen;
       document.getElementById('lighting-panel').classList.toggle('open', isLightingOpen);
@@ -1895,11 +2132,8 @@
         document.getElementById('swatch-light').classList.remove('selected');
         updateLightingPanel();
       }
+      scheduleSave();
     }
-
-
-    // ================================================================
-    //  POINTER INTERACTION
     //  Handles click-and-drag on both the a,b picker and the L slider.
     //  Uses requestAnimationFrame to throttle redraws during drag.
     // ================================================================
@@ -1908,6 +2142,7 @@
     let isDraggingLightness = false;
     let isDraggingChroma = false;
     let isDraggingHue = false;
+    let isDraggingIntensity = false;
     let isAnimationFramePending = false;
 
     /**
@@ -1964,6 +2199,18 @@
       [currentA, currentB] = clampToWorkingGamut(currentL, targetA, targetB);
     }
 
+    /**
+     * Read pointer position over the intensity track and update
+     * lightIntensity accordingly (0 to INTENSITY_MAX).
+     */
+    function updateIntensityFromPointer(event) {
+      const track = document.getElementById('intensity-track');
+      const rect = track.getBoundingClientRect();
+      lightIntensity = Math.max(0, Math.min(INTENSITY_MAX,
+        ((event.clientX - rect.left) / rect.width) * INTENSITY_MAX
+      ));
+    }
+
     // ── Pointer Down: begin drag ──
     abPickerCanvas.addEventListener('pointerdown', (event) => {
       isDraggingAB = true;
@@ -1993,9 +2240,17 @@
       onHueChanged();
     });
 
+    document.getElementById('intensity-track').addEventListener('pointerdown', (event) => {
+      isDraggingIntensity = true;
+      event.target.setPointerCapture(event.pointerId);
+      updateIntensityFromPointer(event);
+      updateLightingPanel();
+      renderResultABMap();
+    });
+
     // ── Pointer Move: update during drag (throttled) ──
     window.addEventListener('pointermove', (event) => {
-      if (!isDraggingAB && !isDraggingLightness && !isDraggingChroma && !isDraggingHue) return;
+      if (!isDraggingAB && !isDraggingLightness && !isDraggingChroma && !isDraggingHue && !isDraggingIntensity) return;
 
       // Throttle to one update per animation frame to avoid jank
       if (isAnimationFramePending) return;
@@ -2020,18 +2275,28 @@
           updateHueFromPointer(event);
           onHueChanged();
         }
+        if (isDraggingIntensity) {
+          updateIntensityFromPointer(event);
+          updateLightingPanel();
+          renderResultABMap();
+        }
       });
     });
 
     // ── Pointer Up: end drag → commit to history ──
     window.addEventListener('pointerup', () => {
       const wasDragging = isDraggingAB || isDraggingLightness || isDraggingChroma || isDraggingHue;
+      const wasIntensity = isDraggingIntensity;
       isDraggingAB = false;
       isDraggingLightness = false;
       isDraggingChroma = false;
       isDraggingHue = false;
+      isDraggingIntensity = false;
       if (wasDragging) {
         pushColorToHistory();
+      }
+      if (wasIntensity) {
+        scheduleSave();
       }
     });
 
@@ -2121,6 +2386,9 @@
     // Apply default states to UI
     ipcRenderer.send('set-aot', true);
     document.getElementById('always-on-top-button').classList.add('active');
+
+    // Restore saved state (colors, history, ICC profile, lighting panel)
+    restoreState();
     updateWorkingCSDisplay();
 
     renderAll();
@@ -2159,6 +2427,7 @@
       h.entries.push([currentL, currentA, currentB]);
       if (h.entries.length > MAX_HISTORY) h.entries.shift();
       h.pos = h.entries.length - 1;
+      scheduleSave();
     }
 
     /**
@@ -2171,6 +2440,7 @@
       currentB = b;
       writePickerToEditTarget();
       renderAll();
+      scheduleSave();
     }
 
     /**
