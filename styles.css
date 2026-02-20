@@ -1,0 +1,427 @@
+/* ── Reset & Base ──────────────────────────────────── */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font: 13px/1.4 'Segoe UI', system-ui, sans-serif;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  padding: 16px;
+  user-select: none;
+}
+
+/* ── Toolbar ───────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.toolbar button {
+  flex: 1;
+  padding: 7px;
+  border: 1px solid #45475a;
+  background: #313244;
+  color: #cdd6f4;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.toolbar button:hover {
+  background: #45475a;
+}
+
+.toolbar button.active {
+  background: #a6e3a1;
+  color: #1e1e2e;
+  border-color: #a6e3a1;
+}
+
+.toolbar button.active-warn {
+  background: #f9e2af;
+  color: #1e1e2e;
+  border-color: #f9e2af;
+}
+
+/* ── Working Color Space Bar ───────────────────────── */
+.cs-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 11px;
+}
+
+.cs-bar .cs-label {
+  color: #6c7086;
+}
+
+.cs-bar .cs-name {
+  color: #89b4fa;
+  font-weight: 600;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-bar button {
+  padding: 4px 10px;
+  border: 1px solid #45475a;
+  background: #313244;
+  color: #cdd6f4;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.cs-bar button:hover {
+  background: #45475a;
+}
+
+#icc-file-input {
+  display: none;
+}
+
+/* ── 2D Picker (a, b axes) ─────────────────────────── */
+.picker-wrap {
+  position: relative;
+  width: 300px;
+  margin: 0 auto;
+}
+
+#ab-picker {
+  display: block;
+  border-radius: 8px;
+  cursor: crosshair;
+}
+
+/* Axis labels positioned around the picker */
+.axis-label {
+  position: absolute;
+  font-size: 9px;
+  color: #6c7086;
+  pointer-events: none;
+}
+
+.axis-label.top {
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.axis-label.bottom {
+  bottom: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.axis-label.left {
+  left: -16px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+}
+
+.axis-label.right {
+  right: -16px;
+  top: 50%;
+  transform: translateY(-50%) rotate(90deg);
+}
+
+/* ── Sliders (Lightness, Chroma, Hue) ────────────── */
+.slider-canvas {
+  display: block;
+  border-radius: 6px;
+  cursor: crosshair;
+  margin: 16px auto 0;
+}
+
+.slider-label {
+  display: block;
+  width: 300px;
+  margin: 6px auto 0;
+  font-size: 9px;
+  color: #6c7086;
+  text-align: center;
+}
+
+/* ── Info Panel ────────────────────────────────────── */
+#info {
+  margin: 14px auto 0;
+  width: 300px;
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+#color-preview {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  border: 2px solid #45475a;
+  flex-shrink: 0;
+}
+
+#oklab-values {
+  font: 12px 'Cascadia Code', 'Consolas', monospace;
+  line-height: 1.7;
+}
+
+/* Hex value rows */
+.hex-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  font: 12px 'Cascadia Code', 'Consolas', monospace;
+}
+
+.hex-row label {
+  min-width: 72px;
+  color: #6c7086;
+  font-family: inherit;
+}
+
+.hex-value {
+  padding: 2px 8px;
+  background: #313244;
+  border-radius: 4px;
+  cursor: text;
+  outline: none;
+}
+
+.hex-value:focus {
+  background: #45475a;
+  box-shadow: 0 0 0 1px #89b4fa;
+}
+
+.editable-val {
+  cursor: text;
+  outline: none;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+.editable-val:focus {
+  background: #45475a;
+  box-shadow: 0 0 0 1px #89b4fa;
+}
+
+.intensity-value {
+  font-size: 11px;
+  color: #cdd6f4;
+  font-weight: 600;
+  min-width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  cursor: text;
+  outline: none;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.intensity-value:focus {
+  background: #45475a;
+  box-shadow: 0 0 0 1px #89b4fa;
+}
+
+.copy-button {
+  border: none;
+  background: #45475a;
+  color: #cdd6f4;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.copy-button:hover {
+  background: #585b70;
+}
+
+/* Gamut indicators */
+.in-gamut {
+  color: #a6e3a1;
+  font-size: 11px;
+}
+
+.out-of-gamut {
+  color: #f38ba8;
+  font-size: 11px;
+}
+
+/* ── Lighting Lab Panel ─────────────────────────────── */
+#lighting-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease;
+  opacity: 0;
+  margin: 0 auto;
+  width: 300px;
+}
+
+#lighting-panel.open {
+  max-height: 900px;
+  opacity: 1;
+  margin: 14px auto 0;
+}
+
+/* Intensity slider */
+.intensity-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px auto 0;
+  width: 300px;
+}
+
+.intensity-row label {
+  font-size: 11px;
+  color: #a6adc8;
+  white-space: nowrap;
+  min-width: 62px;
+}
+
+.intensity-track {
+  flex: 1;
+  height: 18px;
+  border-radius: 6px;
+  cursor: crosshair;
+  position: relative;
+  background: linear-gradient(to right, #1e1e2e, #f9e2af);
+  border: 1px solid #45475a;
+}
+
+.intensity-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  border-radius: 5px;
+  background: #f9e2af;
+  pointer-events: none;
+  opacity: 0.25;
+}
+
+.intensity-thumb {
+  position: absolute;
+  top: -2px;
+  width: 4px;
+  height: 22px;
+  border-radius: 2px;
+  background: #cdd6f4;
+  border: 1px solid #1e1e2e;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.lighting-divider {
+  border: none;
+  border-top: 1px solid #45475a;
+  margin: 10px 0;
+}
+
+.lighting-header {
+  font-size: 11px;
+  color: #a6adc8;
+  text-align: center;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+
+/* Mode selector tabs for Albedo / Light */
+.mode-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.mode-tabs button {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #45475a;
+  background: #313244;
+  color: #6c7086;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.mode-tabs button:hover {
+  background: #45475a;
+  color: #cdd6f4;
+}
+
+.mode-tabs button.tab-active {
+  background: #89b4fa;
+  color: #1e1e2e;
+  border-color: #89b4fa;
+  font-weight: 600;
+}
+
+/* Equation row: Albedo × Light = Result */
+.lighting-equation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.lighting-swatch-wrap {
+  text-align: center;
+}
+
+.lighting-swatch-wrap .swatch-label {
+  font-size: 9px;
+  color: #6c7086;
+  margin-bottom: 3px;
+}
+
+.lighting-swatch {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  border: 2px solid #45475a;
+  cursor: pointer;
+}
+
+.lighting-swatch.read-only {
+  cursor: default;
+}
+
+.lighting-swatch.selected {
+  border-color: #89b4fa;
+  box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.35);
+}
+
+.lighting-operator {
+  font-size: 18px;
+  color: #6c7086;
+  padding: 12px 0 0;
+}
+
+/* Result info in lighting panel */
+.lighting-result-info {
+  margin-top: 8px;
+  font: 12px 'Cascadia Code', 'Consolas', monospace;
+  line-height: 1.6;
+}
+
+.lighting-result-info .label {
+  color: #6c7086;
+}
+
+/* Mini a,b map for result */
+#result-ab-map {
+  display: block;
+  border-radius: 6px;
+  margin: 8px auto 0;
+}
