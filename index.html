@@ -203,10 +203,46 @@
       padding: 2px 8px;
       background: #313244;
       border-radius: 4px;
+      cursor: text;
+      outline: none;
+    }
+
+    .hex-value:focus {
+      background: #45475a;
+      box-shadow: 0 0 0 1px #89b4fa;
+    }
+
+    .editable-val {
+      cursor: text;
+      outline: none;
+      padding: 0 2px;
+      border-radius: 3px;
+    }
+
+    .editable-val:focus {
+      background: #45475a;
+      box-shadow: 0 0 0 1px #89b4fa;
+    }
+
+    .intensity-value {
+      font-size: 11px;
+      color: #cdd6f4;
+      font-weight: 600;
+      min-width: 38px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      cursor: text;
+      outline: none;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    .intensity-value:focus {
+      background: #45475a;
+      box-shadow: 0 0 0 1px #89b4fa;
     }
 
     .copy-button {
-      padding: 2px 7px;
       border: none;
       background: #45475a;
       color: #cdd6f4;
@@ -291,15 +327,6 @@
       border: 1px solid #1e1e2e;
       pointer-events: none;
       transform: translateX(-50%);
-    }
-
-    .intensity-value {
-      font-size: 11px;
-      color: #cdd6f4;
-      font-weight: 600;
-      min-width: 38px;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
     }
 
     .lighting-divider {
@@ -452,13 +479,19 @@
     <!-- Preview swatch + OKLab values -->
     <div class="color-row">
       <div id="color-preview"></div>
-      <div id="oklab-values"></div>
+      <div id="oklab-values">
+        L: <b><span class="editable-val" id="val-L" contenteditable="true" spellcheck="false"></span></b>&ensp;
+        a: <b><span class="editable-val" id="val-a" contenteditable="true" spellcheck="false"></span></b>&ensp;
+        b: <b><span class="editable-val" id="val-b" contenteditable="true" spellcheck="false"></span></b><br>
+        C: <b><span class="editable-val" id="val-C" contenteditable="true" spellcheck="false"></span></b>&ensp;
+        h: <b><span class="editable-val" id="val-h" contenteditable="true" spellcheck="false"></span></b>°
+      </div>
     </div>
 
     <!-- sRGB hex code -->
     <div class="hex-row">
       <label>sRGB:</label>
-      <span class="hex-value" id="srgb-hex"></span>
+      <span class="hex-value" id="srgb-hex" contenteditable="true" spellcheck="false"></span>
       <span id="srgb-gamut-indicator"></span>
       <button class="copy-button" onclick="copyToClipboard(this, 'srgb-hex')">📋</button>
     </div>
@@ -466,7 +499,7 @@
     <!-- Display P3 hex code (always shown) -->
     <div class="hex-row">
       <label>Display P3:</label>
-      <span class="hex-value" id="display-p3-hex"></span>
+      <span class="hex-value" id="display-p3-hex" contenteditable="true" spellcheck="false"></span>
       <span id="display-p3-gamut-indicator"></span>
       <button class="copy-button" onclick="copyToClipboard(this, 'display-p3-hex')">📋</button>
     </div>
@@ -474,7 +507,7 @@
     <!-- Working CS hex code (hidden when working CS is P3 or sRGB) -->
     <div class="hex-row" id="working-cs-row" style="display:none">
       <label id="working-cs-hex-label">Working:</label>
-      <span class="hex-value" id="working-hex"></span>
+      <span class="hex-value" id="working-hex" contenteditable="true" spellcheck="false"></span>
       <span id="working-gamut-indicator"></span>
       <button class="copy-button" onclick="copyToClipboard(this, 'working-hex')">📋</button>
     </div>
@@ -482,7 +515,7 @@
     <!-- Raw CSS oklab() value -->
     <div class="hex-row">
       <label>CSS:</label>
-      <span class="hex-value" id="css-oklab-value"></span>
+      <span class="hex-value" id="css-oklab-value" contenteditable="true" spellcheck="false"></span>
       <button class="copy-button" onclick="copyToClipboard(this, 'css-oklab-value')">📋</button>
     </div>
   </div>
@@ -528,7 +561,7 @@
         <div class="intensity-fill" id="intensity-fill"></div>
         <div class="intensity-thumb" id="intensity-thumb"></div>
       </div>
-      <span class="intensity-value" id="intensity-value">1.00</span>
+      <span class="intensity-value" id="intensity-value" contenteditable="true" spellcheck="false">1.00</span>
     </div>
 
     <!-- Result mini a,b map (read-only) -->
@@ -1779,26 +1812,33 @@
       // Compute OKLCH values for display
       const [currentChroma, currentHue] = oklabToOklch(currentA, currentB);
 
-      // Update the OKLab + OKLCH numeric readout
-      document.getElementById('oklab-values').innerHTML =
-        `L: <b>${currentL.toFixed(3)}</b>&ensp;` +
-        `a: <b>${currentA.toFixed(3)}</b>&ensp;` +
-        `b: <b>${currentB.toFixed(3)}</b><br>` +
-        `C: <b>${currentChroma.toFixed(3)}</b>&ensp;` +
-        `h: <b>${currentHue.toFixed(1)}°</b>`;
+      // Update the OKLab + OKLCH numeric readout (skip focused fields)
+      const active = document.activeElement;
+      if (active !== document.getElementById('val-L'))
+        document.getElementById('val-L').textContent = currentL.toFixed(3);
+      if (active !== document.getElementById('val-a'))
+        document.getElementById('val-a').textContent = currentA.toFixed(3);
+      if (active !== document.getElementById('val-b'))
+        document.getElementById('val-b').textContent = currentB.toFixed(3);
+      if (active !== document.getElementById('val-C'))
+        document.getElementById('val-C').textContent = currentChroma.toFixed(3);
+      if (active !== document.getElementById('val-h'))
+        document.getElementById('val-h').textContent = currentHue.toFixed(1);
 
       // Update the preview swatch using native CSS oklab() for correct rendering
       document.getElementById('color-preview').style.background =
         `oklab(${currentL} ${currentA} ${currentB})`;
 
-      // Update sRGB hex and gamut indicator
-      document.getElementById('srgb-hex').textContent = srgbHex;
+      // Update sRGB hex and gamut indicator (skip focused fields)
+      if (active !== document.getElementById('srgb-hex'))
+        document.getElementById('srgb-hex').textContent = srgbHex;
       document.getElementById('srgb-gamut-indicator').innerHTML = srgbInGamut
         ? '<span class="in-gamut" title="In sRGB gamut">✓</span>'
         : '<span class="out-of-gamut" title="Out of sRGB gamut">✗ out of gamut</span>';
 
       // Update Display P3 hex and gamut indicator
-      document.getElementById('display-p3-hex').textContent = p3Hex;
+      if (active !== document.getElementById('display-p3-hex'))
+        document.getElementById('display-p3-hex').textContent = p3Hex;
       document.getElementById('display-p3-gamut-indicator').innerHTML = p3InGamut
         ? '<span class="in-gamut" title="In Display P3 gamut">✓</span>'
         : '<span class="out-of-gamut" title="Out of Display P3 gamut">✗ out of gamut</span>';
@@ -1807,7 +1847,8 @@
       const isCustomCS = workingCS.name !== 'Display P3' && workingCS.name !== 'sRGB';
       document.getElementById('working-cs-row').style.display = isCustomCS ? '' : 'none';
       if (isCustomCS) {
-        document.getElementById('working-hex').textContent = workingHex;
+        if (active !== document.getElementById('working-hex'))
+          document.getElementById('working-hex').textContent = workingHex;
         document.getElementById('working-gamut-indicator').innerHTML = workingInGamut
           ? '<span class="in-gamut" title="In ' + workingCS.name + ' gamut">✓</span>'
           : '<span class="out-of-gamut" title="Out of ' + workingCS.name + ' gamut">✗ out of gamut</span>';
@@ -1817,8 +1858,9 @@
       }
 
       // Update the raw CSS oklab() value
-      document.getElementById('css-oklab-value').textContent =
-        `oklab(${currentL.toFixed(3)} ${currentA.toFixed(3)} ${currentB.toFixed(3)})`;
+      if (active !== document.getElementById('css-oklab-value'))
+        document.getElementById('css-oklab-value').textContent =
+          `oklab(${currentL.toFixed(3)} ${currentA.toFixed(3)} ${currentB.toFixed(3)})`;
     }
 
 
@@ -1935,7 +1977,8 @@
       const pct = Math.min(lightIntensity / INTENSITY_MAX, 1) * 100;
       document.getElementById('intensity-fill').style.width = pct + '%';
       document.getElementById('intensity-thumb').style.left = pct + '%';
-      document.getElementById('intensity-value').textContent = lightIntensity.toFixed(2);
+      if (document.activeElement !== document.getElementById('intensity-value'))
+        document.getElementById('intensity-value').textContent = lightIntensity.toFixed(2);
 
       const [resL, resA, resB] = computeLitColor();
       document.getElementById('swatch-result').style.background =
@@ -2466,7 +2509,12 @@
     }
 
     // ── Keyboard shortcuts ──
+    // (Ctrl+Z / Ctrl+Shift+Z are intercepted only when NOT editing a field)
     window.addEventListener('keydown', (event) => {
+      // Don't intercept undo/redo while user is typing in an editable field
+      const ae = document.activeElement;
+      if (ae && ae.getAttribute('contenteditable') === 'true') return;
+
       if (event.key === 'z' && event.ctrlKey && !event.shiftKey) {
         event.preventDefault();
         historyBack();
@@ -2474,6 +2522,170 @@
         event.preventDefault();
         historyForward();
       }
+    });
+
+
+    // ================================================================
+    //  EDITABLE FIELD HANDLERS
+    //  All numeric/hex fields are contenteditable. On Enter or blur,
+    //  the value is parsed and applied to the picker state.
+    // ================================================================
+
+    /**
+     * Parse a hex string like "#ff8800" or "ff8800" to [r, g, b]
+     * where each channel is gamma-encoded 0–1. Returns null on failure.
+     */
+    function parseHex(str) {
+      str = str.trim().replace(/^#/, '');
+      if (!/^[0-9a-f]{6}$/i.test(str)) return null;
+      const r = parseInt(str.slice(0, 2), 16) / 255;
+      const g = parseInt(str.slice(2, 4), 16) / 255;
+      const b = parseInt(str.slice(4, 6), 16) / 255;
+      return [r, g, b];
+    }
+
+    /**
+     * Commit a new OKLab color from an editable field and re-render.
+     * Skips the field that was just edited so it doesn't get overwritten.
+     */
+    function commitEditedColor(newL, newA, newB) {
+      currentL = clamp01(newL);
+      currentA = newA;
+      currentB = newB;
+      // Save to edit target BEFORE renderAll, so syncPickerToEditTarget
+      // reads back the new values instead of overwriting them.
+      writePickerToEditTarget();
+      renderABPickerColors();
+      renderAllSliderColors();
+      drawABPicker();
+      drawAllSliders();
+      updateInfoPanel();
+      updateLightingPanel();
+      pushColorToHistory();
+      scheduleSave();
+    }
+
+    /**
+     * Generic handler for committing an editable field on Enter key
+     * (and preventing the newline) or on blur.
+     */
+    function setupEditableCommit(elementId, commitFn) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          el.blur(); // blur triggers the commit via the blur handler
+        }
+        if (e.key === 'Escape') {
+          // Revert: clear user text so blur handler's parse fails (no-op)
+          el.textContent = '';
+          el.blur();
+        }
+      });
+
+      el.addEventListener('blur', () => {
+        commitFn(el);
+      });
+    }
+
+    // ── OKLab L, a, b fields ──
+    setupEditableCommit('val-L', (el) => {
+      const v = parseFloat(el.textContent);
+      if (!isNaN(v)) commitEditedColor(v, currentA, currentB);
+    });
+    setupEditableCommit('val-a', (el) => {
+      const v = parseFloat(el.textContent);
+      if (!isNaN(v)) commitEditedColor(currentL, v, currentB);
+    });
+    setupEditableCommit('val-b', (el) => {
+      const v = parseFloat(el.textContent);
+      if (!isNaN(v)) commitEditedColor(currentL, currentA, v);
+    });
+
+    // ── OKLCH C, h fields ──
+    setupEditableCommit('val-C', (el) => {
+      const c = parseFloat(el.textContent);
+      if (isNaN(c)) return;
+      // Use current hue
+      const [, currentHue] = oklabToOklch(currentA, currentB);
+      const [newA, newB] = oklchToOklab(c, currentHue);
+      commitEditedColor(currentL, newA, newB);
+    });
+    setupEditableCommit('val-h', (el) => {
+      const h = parseFloat(el.textContent);
+      if (isNaN(h)) return;
+      // Use current chroma
+      const [currentChroma] = oklabToOklch(currentA, currentB);
+      const [newA, newB] = oklchToOklab(currentChroma, h);
+      commitEditedColor(currentL, newA, newB);
+    });
+
+    // ── sRGB hex field ──
+    setupEditableCommit('srgb-hex', (el) => {
+      const rgb = parseHex(el.textContent);
+      if (!rgb) return;
+      const linR = gammaToLinear(rgb[0]);
+      const linG = gammaToLinear(rgb[1]);
+      const linB = gammaToLinear(rgb[2]);
+      const [L, a, b] = linearSRGBToOKLab(linR, linG, linB);
+      commitEditedColor(L, a, b);
+    });
+
+    // ── Display P3 hex field ──
+    setupEditableCommit('display-p3-hex', (el) => {
+      const rgb = parseHex(el.textContent);
+      if (!rgb) return;
+      // Decode gamma, convert P3→linear sRGB, then to OKLab
+      const linP3R = gammaToLinear(rgb[0]);
+      const linP3G = gammaToLinear(rgb[1]);
+      const linP3B = gammaToLinear(rgb[2]);
+      const [linR, linG, linB] = linearP3ToLinearSRGB(linP3R, linP3G, linP3B);
+      const [L, a, b] = linearSRGBToOKLab(linR, linG, linB);
+      commitEditedColor(L, a, b);
+    });
+
+    // ── Working CS hex field ──
+    setupEditableCommit('working-hex', (el) => {
+      const rgb = parseHex(el.textContent);
+      if (!rgb) return;
+      // Decode through working CS TRC, then convert to linear sRGB
+      let linR, linG, linB;
+      if (workingCS.perChannelTRC) {
+        linR = workingCS.decode(rgb[0], 0);
+        linG = workingCS.decode(rgb[1], 1);
+        linB = workingCS.decode(rgb[2], 2);
+      } else {
+        linR = workingCS.decode(rgb[0]);
+        linG = workingCS.decode(rgb[1]);
+        linB = workingCS.decode(rgb[2]);
+      }
+      const [sR, sG, sB] = workingCS.toLinearSRGB(linR, linG, linB);
+      const [L, a, b] = linearSRGBToOKLab(sR, sG, sB);
+      commitEditedColor(L, a, b);
+    });
+
+    // ── CSS oklab() value field ──
+    setupEditableCommit('css-oklab-value', (el) => {
+      const text = el.textContent.trim();
+      // Match oklab(L a b) with optional commas
+      const match = text.match(/oklab\(\s*([\d.eE+-]+)\s+[,]?\s*([\d.eE+-]+)\s+[,]?\s*([\d.eE+-]+)\s*\)/i);
+      if (!match) return;
+      const L = parseFloat(match[1]);
+      const a = parseFloat(match[2]);
+      const b = parseFloat(match[3]);
+      if (isNaN(L) || isNaN(a) || isNaN(b)) return;
+      commitEditedColor(L, a, b);
+    });
+
+    // ── Intensity value field ──
+    setupEditableCommit('intensity-value', (el) => {
+      const v = parseFloat(el.textContent);
+      if (isNaN(v) || v < 0) return;
+      lightIntensity = Math.min(v, INTENSITY_MAX);
+      updateLightingPanel();
+      scheduleSave();
     });
   </script>
 
