@@ -188,6 +188,127 @@
       color: #f38ba8;
       font-size: 11px;
     }
+
+    /* ── Lighting Lab Panel ─────────────────────────────── */
+    #lighting-panel {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease, opacity 0.3s ease, margin 0.3s ease;
+      opacity: 0;
+      margin: 0 auto;
+      width: 300px;
+    }
+
+    #lighting-panel.open {
+      max-height: 800px;
+      opacity: 1;
+      margin: 14px auto 0;
+    }
+
+    .lighting-divider {
+      border: none;
+      border-top: 1px solid #45475a;
+      margin: 10px 0;
+    }
+
+    .lighting-header {
+      font-size: 11px;
+      color: #a6adc8;
+      text-align: center;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Mode selector tabs for Albedo / Light */
+    .mode-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+
+    .mode-tabs button {
+      flex: 1;
+      padding: 5px 8px;
+      border: 1px solid #45475a;
+      background: #313244;
+      color: #6c7086;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .mode-tabs button:hover {
+      background: #45475a;
+      color: #cdd6f4;
+    }
+
+    .mode-tabs button.tab-active {
+      background: #89b4fa;
+      color: #1e1e2e;
+      border-color: #89b4fa;
+      font-weight: 600;
+    }
+
+    /* Equation row: Albedo × Light = Result */
+    .lighting-equation {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin: 8px 0;
+    }
+
+    .lighting-swatch-wrap {
+      text-align: center;
+    }
+
+    .lighting-swatch-wrap .swatch-label {
+      font-size: 9px;
+      color: #6c7086;
+      margin-bottom: 3px;
+    }
+
+    .lighting-swatch {
+      width: 48px;
+      height: 48px;
+      border-radius: 6px;
+      border: 2px solid #45475a;
+      cursor: pointer;
+    }
+
+    .lighting-swatch.read-only {
+      cursor: default;
+    }
+
+    .lighting-swatch.selected {
+      border-color: #89b4fa;
+      box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.35);
+    }
+
+    .lighting-operator {
+      font-size: 18px;
+      color: #6c7086;
+      padding: 12px 0 0;
+    }
+
+    /* Result info in lighting panel */
+    .lighting-result-info {
+      margin-top: 8px;
+      font: 12px 'Cascadia Code', 'Consolas', monospace;
+      line-height: 1.6;
+    }
+
+    .lighting-result-info .label {
+      color: #6c7086;
+    }
+
+    /* Mini a,b map for result */
+    #result-ab-map {
+      display: block;
+      border-radius: 6px;
+      margin: 8px auto 0;
+    }
   </style>
 </head>
 
@@ -254,6 +375,59 @@
       <label>CSS:</label>
       <span class="hex-value" id="css-oklab-value"></span>
       <button class="copy-button" onclick="copyToClipboard(this, 'css-oklab-value')">📋</button>
+    </div>
+  </div>
+
+  <!-- ── Lighting Lab Toggle ─────────────────────────── -->
+  <div class="toolbar" style="width:300px; margin:10px auto 0;">
+    <button id="lighting-toggle-button" onclick="toggleLightingPanel()">💡 Lighting Lab</button>
+  </div>
+
+  <!-- ── Lighting Lab Panel (slide-out) ──────────────── -->
+  <div id="lighting-panel">
+    <hr class="lighting-divider">
+    <div class="lighting-header">LIGHTING LAB</div>
+
+    <!-- Mode tabs: which color the main picker edits -->
+    <div class="mode-tabs">
+      <button id="tab-albedo" class="tab-active" onclick="setEditTarget('albedo')">🎨 Albedo</button>
+      <button id="tab-light" onclick="setEditTarget('light')">☀️ Light Color</button>
+    </div>
+
+    <!-- Equation: Albedo × Light = Result -->
+    <div class="lighting-equation">
+      <div class="lighting-swatch-wrap">
+        <div class="swatch-label">Albedo</div>
+        <div id="swatch-albedo" class="lighting-swatch selected" onclick="setEditTarget('albedo')"></div>
+      </div>
+      <div class="lighting-operator">×</div>
+      <div class="lighting-swatch-wrap">
+        <div class="swatch-label">Light</div>
+        <div id="swatch-light" class="lighting-swatch" onclick="setEditTarget('light')"></div>
+      </div>
+      <div class="lighting-operator">=</div>
+      <div class="lighting-swatch-wrap">
+        <div class="swatch-label">Result</div>
+        <div id="swatch-result" class="lighting-swatch read-only"></div>
+      </div>
+    </div>
+
+    <!-- Result mini a,b map (read-only) -->
+    <canvas id="result-ab-map" width="150" height="150"></canvas>
+    <span class="slider-label" style="width:150px; margin-top:4px;">Result in OKLab a,b plane</span>
+
+    <!-- Result numeric values -->
+    <div class="lighting-result-info" id="lighting-result-values"></div>
+    <div class="hex-row" style="margin-top:6px">
+      <label>Result:</label>
+      <span class="hex-value" id="result-hex"></span>
+      <span id="result-gamut-indicator"></span>
+      <button class="copy-button" onclick="copyToClipboard(this, 'result-hex')">📋</button>
+    </div>
+    <div class="hex-row">
+      <label>CSS:</label>
+      <span class="hex-value" id="result-css-value"></span>
+      <button class="copy-button" onclick="copyToClipboard(this, 'result-css-value')">📋</button>
     </div>
   </div>
 
@@ -458,10 +632,27 @@
     let currentB = 0.0;   // Blue–Yellow axis: roughly −0.4 to +0.4
 
     /** Whether the window is set to always-on-top */
-    let isAlwaysOnTop = false;
+    let isAlwaysOnTop = true;
 
     /** Whether to interpret eyedropper-picked colors as display-native (P3) */
-    let interpretPickedAsDisplay = false;
+    let interpretPickedAsDisplay = true;
+
+    /** Lighting Lab state */
+    let isLightingOpen = false;
+    let editTarget = 'albedo';  // 'albedo' or 'light'
+
+    // Albedo color (OKLab) — initialized to current picker color
+    let albedoL = 0.7, albedoA = 0.0, albedoB = 0.0;
+    // Light color (OKLab) — initialized to white (neutral)
+    let lightL = 1.0, lightA = 0.0, lightB = 0.0;
+
+    // ── Color Selection History ──
+    // Three independent history stacks: main picker, albedo, and light.
+    // Each entry is [L, a, b]. Position tracks where we are in the list.
+    const historyMain   = { entries: [[0.7, 0.0, 0.0]], pos: 0 };
+    const historyAlbedo = { entries: [[0.7, 0.0, 0.0]], pos: 0 };
+    const historyLight  = { entries: [[1.0, 0.0, 0.0]], pos: 0 };
+    const MAX_HISTORY = 200;
 
     /** Canvas dimensions & OKLab axis range */
     const PICKER_SIZE = 300;         // Width & height of the a,b picker (px)
@@ -491,6 +682,11 @@
     const lightnessContext = lightnessSliderCanvas.getContext('2d', canvasOptions);
     const chromaContext = chromaSliderCanvas.getContext('2d', canvasOptions);
     const hueContext = hueSliderCanvas.getContext('2d', canvasOptions);
+
+    // Result mini a,b map canvas (150×150)
+    const RESULT_MAP_SIZE = 150;
+    const resultABCanvas = document.getElementById('result-ab-map');
+    const resultABContext = resultABCanvas.getContext('2d', canvasOptions);
 
     // Update the display color space label if P3 is not available
     if (!isDisplayP3Supported) {
@@ -1004,6 +1200,144 @@
 
 
     // ================================================================
+    //  LIGHTING LAB
+    //  Computes result = albedo × light in linear sRGB space.
+    //  Shows the result on a read-only mini a,b map and info readout.
+    // ================================================================
+
+    /**
+     * Compute the lit color: result = albedo × light (component-wise
+     * multiply in linear sRGB). Returns OKLab [L, a, b].
+     */
+    function computeLitColor() {
+      const [albR, albG, albB] = oklabToLinearSRGB(albedoL, albedoA, albedoB);
+      const [litR, litG, litB] = oklabToLinearSRGB(lightL, lightA, lightB);
+
+      // Component-wise multiplication in linear light
+      const resultR = albR * litR;
+      const resultG = albG * litG;
+      const resultB = albB * litB;
+
+      return linearSRGBToOKLab(resultR, resultG, resultB);
+    }
+
+    /** Cached ImageData for the result mini a,b map */
+    let resultABImageData = null;
+
+    /**
+     * Render the result mini a,b map. Shows the color field at the
+     * result's lightness, with a marker at the result (a, b).
+     */
+    function renderResultABMap() {
+      const [resL, resA, resB] = computeLitColor();
+
+      resultABImageData = resultABContext.createImageData(RESULT_MAP_SIZE, RESULT_MAP_SIZE);
+      const pixels = resultABImageData.data;
+      const step = (2 * AB_RANGE) / (RESULT_MAP_SIZE - 1);
+
+      for (let y = 0; y < RESULT_MAP_SIZE; y++) {
+        const bVal = AB_RANGE - y * step;
+        for (let x = 0; x < RESULT_MAP_SIZE; x++) {
+          const aVal = -AB_RANGE + x * step;
+          const [linR, linG, linB] = oklabToLinearSRGB(resL, aVal, bVal);
+          const idx = (y * RESULT_MAP_SIZE + x) * 4;
+
+          let bR, bG, bB, inGamut;
+          if (isDisplayP3Supported) {
+            const [p3R, p3G, p3B] = linearSRGBToLinearP3(linR, linG, linB);
+            inGamut = isInGamut(p3R, p3G, p3B);
+            bR = linearToColorByte(p3R);
+            bG = linearToColorByte(p3G);
+            bB = linearToColorByte(p3B);
+          } else {
+            inGamut = isInGamut(linR, linG, linB);
+            bR = linearToColorByte(linR);
+            bG = linearToColorByte(linG);
+            bB = linearToColorByte(linB);
+          }
+
+          if (!inGamut) {
+            bR = Math.round(bR * 0.15);
+            bG = Math.round(bG * 0.15);
+            bB = Math.round(bB * 0.15);
+            if ((x + y) % 6 < 1) {
+              bR = Math.min(255, bR + 35);
+              bG = Math.min(255, bG + 35);
+              bB = Math.min(255, bB + 35);
+            }
+          }
+
+          pixels[idx]     = bR;
+          pixels[idx + 1] = bG;
+          pixels[idx + 2] = bB;
+          pixels[idx + 3] = 255;
+        }
+      }
+
+      resultABContext.putImageData(resultABImageData, 0, 0);
+
+      // Draw crosshair at the result (a, b) position
+      const cx = ((resA + AB_RANGE) / (2 * AB_RANGE)) * (RESULT_MAP_SIZE - 1);
+      const cy = ((AB_RANGE - resB) / (2 * AB_RANGE)) * (RESULT_MAP_SIZE - 1);
+      const isDark = resL > 0.5;
+
+      resultABContext.strokeStyle = isDark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.85)';
+      resultABContext.lineWidth = 2;
+      resultABContext.beginPath();
+      resultABContext.arc(cx, cy, 5, 0, 2 * Math.PI);
+      resultABContext.stroke();
+
+      resultABContext.strokeStyle = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
+      resultABContext.lineWidth = 1;
+      resultABContext.beginPath();
+      resultABContext.arc(cx, cy, 7, 0, 2 * Math.PI);
+      resultABContext.stroke();
+    }
+
+    /**
+     * Update the lighting panel swatches and result info.
+     */
+    function updateLightingPanel() {
+      if (!isLightingOpen) return;
+
+      // Update swatches using CSS oklab()
+      document.getElementById('swatch-albedo').style.background =
+        `oklab(${albedoL} ${albedoA} ${albedoB})`;
+      document.getElementById('swatch-light').style.background =
+        `oklab(${lightL} ${lightA} ${lightB})`;
+
+      const [resL, resA, resB] = computeLitColor();
+      document.getElementById('swatch-result').style.background =
+        `oklab(${resL} ${resA} ${resB})`;
+
+      // Result numeric readout
+      const [resChroma, resHue] = oklabToOklch(resA, resB);
+      document.getElementById('lighting-result-values').innerHTML =
+        `<span class="label">L:</span> <b>${resL.toFixed(3)}</b>&ensp;` +
+        `<span class="label">a:</span> <b>${resA.toFixed(3)}</b>&ensp;` +
+        `<span class="label">b:</span> <b>${resB.toFixed(3)}</b><br>` +
+        `<span class="label">C:</span> <b>${resChroma.toFixed(3)}</b>&ensp;` +
+        `<span class="label">h:</span> <b>${resHue.toFixed(1)}°</b>`;
+
+      // Result hex
+      const [linR, linG, linB] = oklabToLinearSRGB(resL, resA, resB);
+      const resultInGamut = isInGamut(linR, linG, linB);
+      const resultHex = rgbToHex(
+        linearToGamma(linR), linearToGamma(linG), linearToGamma(linB)
+      );
+      document.getElementById('result-hex').textContent = resultHex;
+      document.getElementById('result-gamut-indicator').innerHTML = resultInGamut
+        ? '<span class="in-gamut" title="In sRGB gamut">✓</span>'
+        : '<span class="out-of-gamut" title="Out of sRGB gamut">✗</span>';
+      document.getElementById('result-css-value').textContent =
+        `oklab(${resL.toFixed(3)} ${resA.toFixed(3)} ${resB.toFixed(3)})`;
+
+      // Render the result mini a,b map
+      renderResultABMap();
+    }
+
+
+    // ================================================================
     //  RENDER ORCHESTRATION
     //  Different interactions require recomputing different parts:
     //  - renderAll: recompute everything (initial load, color pick)
@@ -1026,48 +1360,120 @@
     }
 
     function renderAll() {
+      syncPickerToEditTarget();
       renderABPickerColors();
       renderAllSliderColors();
       drawABPicker();
       drawAllSliders();
       updateInfoPanel();
+      updateLightingPanel();
     }
 
     function onABChanged() {
-      // The a,b picker image is still valid (L hasn't changed),
-      // but all slider gradients need to update.
       renderAllSliderColors();
       drawABPicker();
       drawAllSliders();
       updateInfoPanel();
+      writePickerToEditTarget();
+      updateLightingPanel();
     }
 
     function onLightnessChanged() {
-      // L changed, so the entire a,b color field must be recomputed.
-      // All slider gradients also depend on L.
       renderABPickerColors();
       renderAllSliderColors();
       drawABPicker();
       drawAllSliders();
       updateInfoPanel();
+      writePickerToEditTarget();
+      updateLightingPanel();
     }
 
     function onChromaChanged() {
-      // Chroma changed → a,b changed, so recompute a,b picker + all sliders.
       renderABPickerColors();
       renderAllSliderColors();
       drawABPicker();
       drawAllSliders();
       updateInfoPanel();
+      writePickerToEditTarget();
+      updateLightingPanel();
     }
 
     function onHueChanged() {
-      // Hue changed → a,b changed, so recompute a,b picker + all sliders.
       renderABPickerColors();
       renderAllSliderColors();
       drawABPicker();
       drawAllSliders();
       updateInfoPanel();
+      writePickerToEditTarget();
+      updateLightingPanel();
+    }
+
+    /**
+     * Write the current picker state (currentL/A/B) into the active
+     * edit target (albedo or light). Only acts when Lighting Lab is open.
+     */
+    function writePickerToEditTarget() {
+      if (!isLightingOpen) return;
+      if (editTarget === 'albedo') {
+        albedoL = currentL;
+        albedoA = currentA;
+        albedoB = currentB;
+      } else {
+        lightL = currentL;
+        lightA = currentA;
+        lightB = currentB;
+      }
+    }
+
+    /**
+     * Load the active edit target's color into the picker state
+     * and re-render.
+     */
+    function syncPickerToEditTarget() {
+      if (!isLightingOpen) return;
+      if (editTarget === 'albedo') {
+        currentL = albedoL;
+        currentA = albedoA;
+        currentB = albedoB;
+      } else {
+        currentL = lightL;
+        currentA = lightA;
+        currentB = lightB;
+      }
+    }
+
+    /**
+     * Switch the main picker to edit albedo or light color.
+     */
+    function setEditTarget(target) {
+      editTarget = target;
+      document.getElementById('tab-albedo').classList.toggle('tab-active', target === 'albedo');
+      document.getElementById('tab-light').classList.toggle('tab-active', target === 'light');
+      document.getElementById('swatch-albedo').classList.toggle('selected', target === 'albedo');
+      document.getElementById('swatch-light').classList.toggle('selected', target === 'light');
+      syncPickerToEditTarget();
+      renderAll();
+    }
+
+    /**
+     * Toggle the Lighting Lab panel open/closed.
+     */
+    function toggleLightingPanel() {
+      isLightingOpen = !isLightingOpen;
+      document.getElementById('lighting-panel').classList.toggle('open', isLightingOpen);
+      document.getElementById('lighting-toggle-button').classList.toggle('active', isLightingOpen);
+      if (isLightingOpen) {
+        // Snapshot current picker color as albedo
+        albedoL = currentL;
+        albedoA = currentA;
+        albedoB = currentB;
+        editTarget = 'albedo';
+        document.getElementById('tab-albedo').classList.add('tab-active');
+        document.getElementById('tab-light').classList.remove('tab-active');
+        document.getElementById('swatch-albedo').classList.add('selected');
+        document.getElementById('swatch-light').classList.remove('selected');
+        updateLightingPanel();
+      }
     }
 
 
@@ -1196,12 +1602,16 @@
       });
     });
 
-    // ── Pointer Up: end drag ──
+    // ── Pointer Up: end drag → commit to history ──
     window.addEventListener('pointerup', () => {
+      const wasDragging = isDraggingAB || isDraggingLightness || isDraggingChroma || isDraggingHue;
       isDraggingAB = false;
       isDraggingLightness = false;
       isDraggingChroma = false;
       isDraggingHue = false;
+      if (wasDragging) {
+        pushColorToHistory();
+      }
     });
 
 
@@ -1252,6 +1662,8 @@
         currentL = L;
         currentA = a;
         currentB = b;
+        writePickerToEditTarget();
+        pushColorToHistory();
         renderAll();
       } catch (error) {
         // User cancelled the eyedropper — no action needed
@@ -1303,7 +1715,96 @@
     //  INITIALIZATION
     // ================================================================
 
+    // Apply default states to UI
+    ipcRenderer.send('set-aot', true);
+    document.getElementById('always-on-top-button').classList.add('active');
+    if (isDisplayP3Supported) {
+      document.getElementById('pick-as-display-button').classList.add('active-warn');
+      document.getElementById('pick-space-label').textContent = 'Display P3';
+    }
+
     renderAll();
+
+
+    // ================================================================
+    //  COLOR SELECTION HISTORY
+    //  Independent history stacks for main picker, albedo, and light.
+    //  Ctrl+Z navigates backward, Ctrl+Shift+Z forward.
+    //  New selections always append to the top; forward history is
+    //  preserved (this is navigation, not undo/redo).
+    // ================================================================
+
+    /**
+     * Get the active history stack based on the current mode.
+     */
+    function getActiveHistory() {
+      if (!isLightingOpen) return historyMain;
+      return editTarget === 'albedo' ? historyAlbedo : historyLight;
+    }
+
+    /**
+     * Push the current color onto the active history stack.
+     * Moves position to the new top entry.
+     */
+    function pushColorToHistory() {
+      const h = getActiveHistory();
+      const last = h.entries[h.entries.length - 1];
+      // Skip duplicate if color hasn't actually changed
+      if (last &&
+          Math.abs(last[0] - currentL) < 1e-6 &&
+          Math.abs(last[1] - currentA) < 1e-6 &&
+          Math.abs(last[2] - currentB) < 1e-6) {
+        return;
+      }
+      h.entries.push([currentL, currentA, currentB]);
+      if (h.entries.length > MAX_HISTORY) h.entries.shift();
+      h.pos = h.entries.length - 1;
+    }
+
+    /**
+     * Navigate to a history entry and apply its color.
+     */
+    function applyHistoryEntry(h) {
+      const [L, a, b] = h.entries[h.pos];
+      currentL = L;
+      currentA = a;
+      currentB = b;
+      writePickerToEditTarget();
+      renderAll();
+    }
+
+    /**
+     * Step backward in the active history (Ctrl+Z).
+     */
+    function historyBack() {
+      const h = getActiveHistory();
+      if (h.pos > 0) {
+        h.pos--;
+        applyHistoryEntry(h);
+      }
+    }
+
+    /**
+     * Step forward in the active history (Ctrl+Shift+Z).
+     */
+    function historyForward() {
+      const h = getActiveHistory();
+      if (h.pos < h.entries.length - 1) {
+        h.pos++;
+        applyHistoryEntry(h);
+      }
+    }
+
+    // ── Keyboard shortcuts ──
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'z' && event.ctrlKey && !event.shiftKey) {
+        event.preventDefault();
+        historyBack();
+      } else if (event.key === 'Z' && event.ctrlKey && event.shiftKey) {
+        event.preventDefault();
+        historyForward();
+      }
+    });
   </script>
 
 </body>
