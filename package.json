@@ -1,11 +1,39 @@
 {
   "name": "oklab-color-picker",
   "version": "1.0.0",
+  "description": "OKLab Color Picker",
   "main": "main.js",
+  "author": "OKLab Color Picker",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.oklab.colorpicker",
+    "productName": "OKLab Color Picker",
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "styles.css",
+      "color-math.js",
+      "color-spaces.js",
+      "state.js",
+      "persistence.js",
+      "rendering.js",
+      "interaction.js",
+      "app.js"
+    ]
   },
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
   }
 }
